@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nettoyage RJH Live Match</title>
+    <style>
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+        background: #f7f8fc;
+        color: #121826;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-align: center;
+      }
+
+      main {
+        width: min(88vw, 420px);
+      }
+
+      h1 {
+        color: #d71920;
+        font-size: 1.4rem;
+      }
+
+      p {
+        color: #5c6474;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Nettoyage en cours...</h1>
+      <p>RJH Live Match va se rouvrir automatiquement.</p>
+    </main>
+    <script>
+      async function clearAppCache() {
+        if ("serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+        }
+
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((key) => caches.delete(key)));
+        }
+
+        window.location.replace("/?fresh=" + Date.now());
+      }
+
+      clearAppCache().catch(() => {
+        window.location.replace("/?fresh=" + Date.now());
+      });
+    </script>
+  </body>
+</html>
