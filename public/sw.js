@@ -1,4 +1,4 @@
-const CACHE_NAME = "rjh-live-match-v1";
+const CACHE_NAME = "rjh-live-match-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
