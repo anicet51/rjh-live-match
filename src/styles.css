@@ -104,6 +104,7 @@ h2 {
 .event-card,
 .logo-card,
 .timeline,
+.export-preview,
 .export-actions {
   border: 1px solid rgba(18, 24, 38, 0.08);
   border-radius: 8px;
@@ -268,6 +269,7 @@ h2 {
 .event-card,
 .logo-card,
 .timeline,
+.export-preview,
 .export-actions {
   margin-top: 12px;
   padding: 14px;
@@ -572,17 +574,70 @@ h2 {
   background: #114fbd;
 }
 
+.export-preview {
+  background: #fff;
+}
+
+.preview-message {
+  margin: 12px 0;
+  color: #5c6474;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.export-preview img {
+  display: block;
+  width: 100%;
+  border: 1px solid #e3e7f0;
+  border-radius: 8px;
+  background: #f7f8fc;
+}
+
+.preview-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.preview-actions button {
+  min-height: 48px;
+  border-radius: 8px;
+  color: #fff;
+  background: #114fbd;
+  font-weight: 950;
+}
+
+.preview-actions button:first-child {
+  background: #d71920;
+}
+
 .export-stage {
   position: fixed;
-  left: -9999px;
+  left: 0;
   top: 0;
   width: 1080px;
+  z-index: -1;
+  opacity: 0;
   pointer-events: none;
+}
+
+.export-stage.active {
+  z-index: 9999;
+  opacity: 1;
+}
+
+.export-stage .share-card,
+.export-stage .history-card {
+  display: none;
+}
+
+.export-stage.active .render-target {
+  display: flex;
 }
 
 .share-card,
 .history-card {
-  display: flex;
   flex-direction: column;
   width: 1080px;
   padding: 76px;

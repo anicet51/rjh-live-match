@@ -44,6 +44,10 @@ function createEventId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function waitForPaint() {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
 function getInitials(name) {
   return name
     .split(" ")
@@ -88,6 +92,8 @@ function App() {
   const [eventPlayer, setEventPlayer] = useState("");
   const [eventComment, setEventComment] = useState("");
   const [exporting, setExporting] = useState("");
+  const [exportPreview, setExportPreview] = useState(null);
+  const [exportMessage, setExportMessage] = useState("");
   const exportRef = useRef(null);
   const historyExportRef = useRef(null);
 
@@ -100,6 +106,14 @@ function App() {
       // Safari can reject localStorage in a few privacy/storage edge cases.
     }
   }, [match]);
+
+  useEffect(() => {
+    return () => {
+      if (exportPreview?.url) {
+        URL.revokeObjectURL(exportPreview.url);
+      }
+    };
+  }, [exportPreview]);
 
   function updateField(field, value) {
     setMatch((current) => ({ ...current, [field]: value }));
@@ -179,39 +193,116 @@ function App() {
     setEventComment("");
   }
 
-  function downloadCanvas(canvas, suffix) {
-    const link = document.createElement("a");
-    const filename = `rjh-live-${match.homeTeam}-${match.awayTeam}-${suffix}`
+  function createExportFilename(suffix) {
+    return `rjh-live-${match.homeTeam}-${match.awayTeam}-${suffix}`
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
-    link.download = `${filename}.png`;
-    link.href = canvas.toDataURL("image/png");
+  }
+
+  function closeExportPreview() {
+    setExportPreview((current) => {
+      if (current?.url) {
+        URL.revokeObjectURL(current.url);
+      }
+      return null;
+    });
+    setExportMessage("");
+  }
+
+  function canvasToBlob(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Image impossible à créer"));
+        }
+      }, "image/png");
+    });
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = url;
     link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function shareFile(file) {
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: "RJH Live Match",
+        text: `${match.homeTeam} ${match.homeScore} - ${match.awayScore} ${match.awayTeam} (${formatMinute(match.minute)})`,
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  async function exportCanvas(canvas, suffix) {
+    const filename = `${createExportFilename(suffix)}.png`;
+    const blob = await canvasToBlob(canvas);
+    const file = new File([blob], filename, { type: "image/png" });
+    const url = URL.createObjectURL(blob);
+
+    setExportPreview((current) => {
+      if (current?.url) {
+        URL.revokeObjectURL(current.url);
+      }
+      return { file, filename, url };
+    });
+
+    try {
+      const shared = await shareFile(file);
+      setExportMessage(
+        shared
+          ? "Le partage est ouvert. Choisis WhatsApp si tu veux l'envoyer directement."
+          : "Image prête. Sur iPhone, garde le doigt sur l'image pour l'enregistrer ou la partager.",
+      );
+    } catch (error) {
+      setExportMessage(
+        error?.name === "AbortError"
+          ? "Partage annulé. L'image reste disponible ci-dessous."
+          : "Image prête. Sur iPhone, garde le doigt sur l'image pour l'enregistrer ou la partager.",
+      );
+    }
+
+    if (!navigator.canShare?.({ files: [file] })) {
+      downloadBlob(blob, filename);
+    }
   }
 
   async function exportImage() {
     if (!exportRef.current) return;
     setExporting("square");
+    setExportMessage("");
 
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await waitForPaint();
     const canvas = await html2canvas(exportRef.current, {
       width: 1080,
       height: 1080,
+      windowWidth: 1080,
+      windowHeight: 1080,
       scale: 1,
       backgroundColor: "#f7f8fc",
       useCORS: true,
     });
 
-    downloadCanvas(canvas, "whatsapp");
+    await exportCanvas(canvas, "whatsapp");
     setExporting("");
   }
 
   async function exportFullHistory() {
     if (!historyExportRef.current) return;
     setExporting("history");
+    setExportMessage("");
 
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await waitForPaint();
     const height = historyExportRef.current.scrollHeight;
     const canvas = await html2canvas(historyExportRef.current, {
       width: 1080,
@@ -223,7 +314,7 @@ function App() {
       useCORS: true,
     });
 
-    downloadCanvas(canvas, "historique-complet");
+    await exportCanvas(canvas, "historique-complet");
     setExporting("");
   }
 
@@ -398,8 +489,32 @@ function App() {
         </button>
       </section>
 
-      <div className="export-stage" aria-hidden="true">
-        <div className="share-card" ref={exportRef}>
+      {exportPreview && (
+        <section className="export-preview" aria-label="Image exportée">
+          <div className="section-title">
+            <div>
+              <p className="eyebrow">Export</p>
+              <h2>Image prête</h2>
+            </div>
+            <button type="button" className="ghost-button" onClick={closeExportPreview}>
+              Fermer
+            </button>
+          </div>
+          {exportMessage && <p className="preview-message">{exportMessage}</p>}
+          <img src={exportPreview.url} alt="Visuel RJH Live Match à partager" />
+          <div className="preview-actions">
+            <button type="button" onClick={() => shareFile(exportPreview.file)}>
+              Partager
+            </button>
+            <button type="button" onClick={() => downloadBlob(exportPreview.file, exportPreview.filename)}>
+              Télécharger
+            </button>
+          </div>
+        </section>
+      )}
+
+      <div className={`export-stage ${exporting ? "active" : ""}`} aria-hidden="true">
+        <div className={`share-card ${exporting === "square" ? "render-target" : ""}`} ref={exportRef}>
           <div className="share-header">
             <span>RJH Live Match</span>
             <small>Anicet51</small>
@@ -435,7 +550,7 @@ function App() {
           </div>
         </div>
 
-        <div className="history-card" ref={historyExportRef}>
+        <div className={`history-card ${exporting === "history" ? "render-target" : ""}`} ref={historyExportRef}>
           <div className="share-header">
             <span>RJH Live Match</span>
             <small>Anicet51</small>
